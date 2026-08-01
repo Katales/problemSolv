@@ -49,4 +49,4 @@ export function solve(orders) {
       bikes.getNewBikeFor(order);
   } );
   return bikes.max;
-}
+};
