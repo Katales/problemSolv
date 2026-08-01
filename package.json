@@ -1,0 +1,32 @@
+{
+  "name": "problemsolv",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "private": true,
+  "scripts": {
+    "new": "node scripts/new-prblm.js",
+    "test": "node scripts/run-test.js",
+    "test:all": "node --import tsx --test \"prblms/**/*.test.{js,ts}\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Katales/problemSolv.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Katales/problemSolv/issues"
+  },
+  "homepage": "https://github.com/Katales/problemSolv#readme",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true
+  }
+}
