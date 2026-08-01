@@ -12,10 +12,11 @@ written in TypeScript by default with a JavaScript fallback.
 ## Usage
 
 Create a new problem:
-`npm run new -- problem-name [--js]`
+`npm run new -- problem-dir [--js]`  
+ \* where `problem-dir` === problem-name
 
 Run all tests:
 `npm run test:all`
 
 Run tests for one problem:
-`npm test -- prblms/problem-name/`
+`npm test -- prblms/problem-dir/`

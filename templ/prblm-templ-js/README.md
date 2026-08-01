@@ -1,7 +1,12 @@
-# Problem Name
+## Problem Name  
+_\<Link\>_  
+***\<Title\>***
 
-Link: 
-Difficulty: 
-Tags: 
+Difficulty:  
+Tags:  
+**To run test:**
+```bash
+npm test -- prblms/problem-dir/
+```  
+### Description  
 
-## Notes
