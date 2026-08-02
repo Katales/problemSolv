@@ -11,9 +11,7 @@ if (!rawName) {
 }
 
 function sanitize(name) {
-  return name
-    .replace(/ +/g, '_')
-    .replace(/[^A-Za-z0-9._-]/g, '');
+  return name.replace(/ +/g, '_').replace(/[^A-Za-z0-9._-]/g, '');
 }
 
 const name = sanitize(rawName);

@@ -1,5 +1,5 @@
-import { existsSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const target = process.argv[2];
