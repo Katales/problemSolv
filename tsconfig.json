@@ -9,7 +9,9 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "noEmit": true
+    "noEmit": true,
+    "types": ["node"],
+    "allowImportingTsExtensions": true
   },
   "include": ["prblms/**/*"]
 }
