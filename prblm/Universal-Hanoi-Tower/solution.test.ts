@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { solve } from './solution.ts';
+import { hanoi } from './solution.ts';
 
 test('basic case', () => {
-  assert.equal(solve('example'), 'expected');
+  assert.equal(hanoi([1, 2, 3]), 4);
 });
