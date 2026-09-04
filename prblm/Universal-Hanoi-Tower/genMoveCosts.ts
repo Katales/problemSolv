@@ -115,18 +115,19 @@ class GameBoard {
   // Move SINGLE `disk` to `toRod`
   // returns: 1 - if success, 0 - failure
   moveDisk(movePar: MoveDiskParams): number {
-    console.log(`[${this.moveTree.currNode.level + 1}] move SINGLE disk > gState: ${this.gState}`); // --- DEBUG TRACING
-    this.prnMoveDiskParams(movePar, '     input:');
-
     if (!movePar.fromRod) movePar.fromRod = this.gState[movePar.disk];
     // do checks
     if (!(this.isValidMove(movePar) && this.isUpperDisk(movePar.disk))) return 0;
+
+    const oldGState: number[] = [ ...this.gState]; // --- DEBUG TRACING
 
     // move the disk
     this.rods[movePar.toRod]!.push(this.rods[movePar.fromRod]!.pop()!);
     this.gState[movePar.disk] = movePar.toRod;
 
-    console.log(`     after the move > gState: ${this.gState}`); // --- DEBUG TRACING
+    console.log( // --- DEBUG TRACING
+      `[${this.moveTree.currNode.level + 1}] move SINGLE disk ${JSON.stringify(movePar)} | gState: ${oldGState} => ${this.gState}`
+    ); 
 
     return this.moveTree.logMove(movePar) ? 1 : 0;
   }
@@ -134,9 +135,6 @@ class GameBoard {
   // Move specified `disk` and ALL disks above it to a `toRod`
   //returns: number of moves, 0 - move isn't possible
   moveDiskAll(movePar: MoveDiskParams): number {
-    console.log(`>>> moveDiskAll > gState: ${this.gState}`); // --- DEBUG TRACING
-    this.prnMoveDiskParams(movePar, '>>> input:');
-
     if (!this.isValidMove(movePar)) return 0;
     let { disk, toDisk, fromRod, toRod } = movePar;
     if (!fromRod) fromRod = this.gState[disk];
@@ -146,18 +144,21 @@ class GameBoard {
     const movesStart: number = this.moveTree.currNode.level;
     const movingPlan: MovingPlan = [];
     const avRods: number = this.getValidMoves(disk).length;
+
     if (avRods < 2) throw new Error("Number of available rods is below 2 - can't proceed!");
 
     let diskSlot = this.getDiskSlot(disk);
     let nDisks2Move: number = this.rods[fromRod].length - diskSlot;
+
     // --- DEBUG TRACING
-    console.log(
-      `--- (ini) Status update: disk=${disk} , diskSlot=${diskSlot}, nDisks2Move=${nDisks2Move}, avRods=${avRods}`,
-    );
+    console.log(`>>> moveDiskAll | movePar: ${JSON.stringify(movePar)} | gState: ${this.gState}`); 
+    console.log(`    (Status) disk=${disk} , diskSlot=${diskSlot}, nDisks2Move=${nDisks2Move}, avRods=${avRods}`);
 
     // add the first item to the movePlan (SINGLE disk)
     movingPlan.unshift({ disk, toDisk: disk, fromRod, toRod });
-    this.prnArrMoveDiskParams(movingPlan, 'Moving Plan (first move)');
+    
+    // --- DEBUG TRACING
+    console.log(`    First move: ${JSON.stringify(movingPlan[0])}`);
 
     // update disk parameters after the first move
     diskSlot++;
@@ -166,14 +167,11 @@ class GameBoard {
 
     const validMoves = this.getValidMoves(disk, movingPlan);
     // --- DEBUG TRACING
-    console.log(
-      `--- (before Plan) Status update: disk=${disk} , diskSlot=${diskSlot}, nDisks2Move=${nDisks2Move}, avRods=${avRods}`,
-    );
-    this.prnArrMoveDiskParams(validMoves, 'Array of Valid Moves:');
+    this.prnArrMoveDiskParams(validMoves, '    Array of Valid Moves:');
 
     //Get the disk distribution for multiple-disk move & add plan records
     const diskDistr: number[] = this.getDiskDistr(nDisks2Move, avRods);
-    console.log('Disk distribution:', diskDistr); // --- DEBUG TRACING
+    console.log('    Disk distribution:', diskDistr); // --- DEBUG TRACING
 
     for (let i = 2; i < diskDistr.length; i++) {
       if (diskDistr[i] === 0) continue;
@@ -199,12 +197,12 @@ class GameBoard {
       nDisks2Move -= diskDistr[i];
       if (nDisks2Move) disk = this.rods[fromRod][diskSlot];
     }
+
     // --- DEBUG TRACING
-    this.prnArrMoveDiskParams(movingPlan, 'WHOLE Moving Plan:');
+    this.prnArrMoveDiskParams(movingPlan, '    WHOLE Moving Plan:');
 
     // Execute the Plan !
     for (const movePlanEl of movingPlan) {
-      this.prnMoveDiskParams(movePlanEl, 'Moving Plan Elem.: ');
       if (!this.moveDiskAll(movePlanEl))
         throw new Error("Invalid move in the movingPlan - Panic mode's ON!!!");
     }
@@ -318,17 +316,11 @@ class GameBoard {
     return costTable;
   }
 
-  prnMoveDiskParams(moveDiskParams: MoveDiskParams, msg: string = '') {
-    console.log(
-      `${msg} Disk:${moveDiskParams.disk}, ToDisk:${moveDiskParams.toDisk}, `,
-      `fromRod:${moveDiskParams.fromRod}, toRod:${moveDiskParams.toRod} }`,
-    );
-  }
-
+  // --- DEBUG TRACING
   prnArrMoveDiskParams(arrMoveDiskParams: MoveDiskParams[], msg: string = '') {
     console.log(msg);
     for (const moveInd in arrMoveDiskParams) {
-      this.prnMoveDiskParams(arrMoveDiskParams[moveInd], `\t[${moveInd}]`);
+      console.log(`\t[${moveInd}] ${JSON.stringify(arrMoveDiskParams[moveInd])}`);
     }
   }
 } // --- class GameBoard ---
