@@ -435,15 +435,16 @@ class MoveNode {
 // ====================== Harness - Part 2  =============================
 
 // ---------------------- Input Data ------------------------------
-// const posts: number[] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
-const posts: number[] = [1, 1, 1, 1, 1];
 const nRods: number = 5;
+const nDisks: number = 6;
 
-const nDisks: number = posts.length;
+const posts: number[] = Array(nDisks).fill(1);
+
 const gBoard = new GameBoard(posts, nRods); // Example initialization with 4 disks on rod 1
 
 console.log(`Initial state of rods: ${gBoard.gState}`);
 printCostTable(gBoard);
+
 console.log(
   // --- DEBUG TRACING
   `Number of moves: ${gBoard.moveDiskAll({ disk: nDisks, toDisk: 1, fromRod: 1, toRod: 2 })} `,
