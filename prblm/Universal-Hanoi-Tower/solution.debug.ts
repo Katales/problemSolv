@@ -20,6 +20,8 @@ type MoveOptParams = {
 
 type MovingPlan = Array<MoveDiskParams>;
 
+type MoveRec = { movePar?: MoveDiskParams, gState: number[] };
+
 // --- **class GameBoard** --- represents the state of the rods and disks in the Tower of Hanoi problem.
 // It maintains the state in two structures:
 // 1. rods: An array where each index represents a rod and contains an array of disks on that rod.
@@ -84,7 +86,7 @@ class GameBoard {
     return this.rods[this.gState[disk]].indexOf(disk);
   }
 
-  // is `moveParams` represent a valid move
+  // is `movePar` represent a valid move
   // `exclMovingPlan` is optional
   // returns
   isValidMove(movePar: MoveDiskParams, exclMovingPlan: MovingPlan = []): boolean {
@@ -126,7 +128,7 @@ class GameBoard {
     this.gState[movePar.disk] = movePar.toRod;
 
     console.log( // --- DEBUG TRACING
-      `[${this.moveTree.currNode.level + 1}] move SINGLE disk ${JSON.stringify(movePar)} | gState: ${oldGState} => ${this.gState}`
+      `[`,this.moveTree.currNode.level + 1,`] move SINGLE disk: ${movePar.disk}  fromRod:${movePar.fromRod} toRod:${movePar.toRod} | gState: ${oldGState} => ${this.gState}`
     ); 
 
     return this.moveTree.logMove(movePar) ? 1 : 0;
@@ -320,7 +322,8 @@ class GameBoard {
   prnArrMoveDiskParams(arrMoveDiskParams: MoveDiskParams[], msg: string = '') {
     console.log(msg);
     for (const moveInd in arrMoveDiskParams) {
-      console.log(`\t[${moveInd}] ${JSON.stringify(arrMoveDiskParams[moveInd])}`);
+      // console.log(`\t[${moveInd}] ${JSON.stringify(arrMoveDiskParams[moveInd])}`);
+      console.log(`\t[${moveInd}] `, arrMoveDiskParams[moveInd] );
     }
   }
 } // --- class GameBoard ---
@@ -348,6 +351,31 @@ class MoveTree {
     this.currNode = newMoveNode;
     return true;
   }
+
+  getMoveRecords(): Array<MoveRec> {
+  const moveRecords: Array<MoveRec> = [{ gState: this.topNode.gState }];
+
+  let node: MoveNode = this.topNode;
+  let firstKey = Object.keys(node.moveOpts).shift();
+  while (firstKey !== undefined) {
+    const moveOpt: MoveOptParams = node.moveOpts[Number(firstKey)];
+    if (!moveOpt.childNode) throw new Error("moveOpt has no childNode. Abort!");
+
+    moveRecords.push({
+      movePar: {
+        disk: moveOpt.disk,
+        toRod: moveOpt.toRod,
+        fromRod: node.gState[moveOpt.disk],
+      },
+      gState: moveOpt.childNode.gState,
+    });
+
+    node = moveOpt.childNode;
+    firstKey = Object.keys(node.moveOpts).shift();
+  }
+
+  return moveRecords;
+}
 }
 // --- class MoveTree ---
 
@@ -438,6 +466,7 @@ class MoveNode {
 const nRods: number = 5;
 const nDisks: number = 6;
 
+// --- create posts array for GameBoard instantiation
 const posts: number[] = Array(nDisks).fill(1);
 
 const gBoard = new GameBoard(posts, nRods); // Example initialization with 4 disks on rod 1
