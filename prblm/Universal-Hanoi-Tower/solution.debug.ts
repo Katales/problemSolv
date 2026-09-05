@@ -20,7 +20,10 @@ type MoveOptParams = {
 
 type MovingPlan = Array<MoveDiskParams>;
 
-type MoveRec = { movePar?: MoveDiskParams, gState: number[] };
+type MoveRec = { 
+  movePar?: MoveDiskParams, 
+  gState: number[] 
+};
 
 // --- **class GameBoard** --- represents the state of the rods and disks in the Tower of Hanoi problem.
 // It maintains the state in two structures:
@@ -463,8 +466,8 @@ class MoveNode {
 // ====================== Harness - Part 2  =============================
 
 // ---------------------- Input Data ------------------------------
-const nRods: number = 5;
-const nDisks: number = 6;
+const nRods: number = 4;
+const nDisks: number = 8;
 
 // --- create posts array for GameBoard instantiation
 const posts: number[] = Array(nDisks).fill(1);
@@ -479,6 +482,9 @@ console.log(
   `Number of moves: ${gBoard.moveDiskAll({ disk: nDisks, toDisk: 1, fromRod: 1, toRod: 2 })} `,
 );
 
+printMoveRecords(gBoard.moveTree);
+
+// Prints Cost Table
 function printCostTable(gBoard: GameBoard): void {
   const firstColumn = 2;
 
@@ -491,4 +497,63 @@ function printCostTable(gBoard: GameBoard): void {
 
     console.log(values.join('\t'));
   }
+}
+
+// Prints the move tree's records: initial state, then each move with its resulting gState
+function printMoveRecords(moveTree: MoveTree): void {
+  const moveRecords: Array<MoveRec> = moveTree.getMoveRecords();
+
+  console.log(`Initial GameBoard state: ${moveRecords[0].gState}`);
+
+  for (let i = 1; i < moveRecords.length; i++) {
+    const { movePar, gState } = moveRecords[i];
+    console.log(
+      `[${i}] move disk ${movePar!.disk}  fromRod:${movePar!.fromRod} toRod:${movePar!.toRod} | gState: ${gState}`,
+    );
+  }
+}
+
+// Prints Rods array
+function printRods(gBoard: GameBoard): void {
+  const firstColumn = 2;
+
+  for (let row = 0; row <= gBoard.rods.length - 1; row++) {
+    console.log(`Rod[${row}]`, gBoard.rods[row]);
+  }
+}
+
+function printRodsPretty(gBoard: GameBoard): void {
+  const { rods, nRods, nDisks } = gBoard;
+  const colWidth = String(nDisks).length + 2; // enough space for the widest disk number
+
+  // build each rod's stack bottom-to-top, skipping the dummy disk `0` at index 0
+  const stacks: number[][] = [];
+  for (let r = 1; r <= nRods; r++) stacks.push(rods[r].slice(1));
+
+  const maxHeight = Math.max(...stacks.map((s) => s.length), 0);
+
+  const lines: string[] = [];
+  for (let level = maxHeight; level >= 1; level--) {
+    const row = stacks
+      .map((stack) => {
+        const disk = stack[level - 1];
+        return centerText(disk !== undefined ? String(disk) : '|', colWidth);
+      })
+      .join('');
+    lines.push(row);
+  }
+
+  lines.push('-'.repeat(colWidth * nRods)); // ground line
+  lines.push(
+    Array.from({ length: nRods }, (_, i) => centerText(String(i + 1), colWidth)).join(''),
+  ); // rod numbers
+
+  console.log(lines.join('\n'));
+}
+
+function centerText(text: string, width: number): string {
+  const totalPad = width - text.length;
+  const left = Math.floor(totalPad / 2);
+  const right = totalPad - left;
+  return ' '.repeat(left) + text + ' '.repeat(right);
 }
