@@ -1,7 +1,7 @@
 ## Problem Name  
 ***Universal Hanoi Tower***
 
-Difficulty: Hard  
+Difficulty: Expert/Advanced  
 Tags:  
 **To run test:**
 ```bash
@@ -22,7 +22,7 @@ The solution must support an arbitrary number of disks and rods.
 * The rods are numbered from `1` to `m`.
 * The disks are numbered from `1` to `n`, where disk `1` is the smallest and disk `n` is the largest.
 * Initially, all disks are located on rod `1`.
-* The goal is to move all disks to rod `2`.
+* The goal is to move all disks to rod `2`. (or any other rod)
 * Only one disk can be moved at a time.
 * In one move, the topmost disk from one rod may be moved to another rod.
 * A disk may never be placed on top of a smaller disk.
