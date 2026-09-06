@@ -148,7 +148,8 @@ class GameBoard {
 
     const movesStart: number = this.moveTree.currNode.level;
     const movingPlan: MovingPlan = [];
-    const avRods: number = this.getValidMoves(disk).length;
+    let validMoves: Array<MoveDiskParams> = this.getValidMoves(disk);
+    const avRods: number = validMoves.length;
 
     if (avRods < 2) throw new Error("Number of available rods is below 2 - can't proceed!");
 
@@ -160,17 +161,17 @@ class GameBoard {
     console.log(`    (Status) disk=${disk} , diskSlot=${diskSlot}, nDisks2Move=${nDisks2Move}, avRods=${avRods}`);
 
     // add the first item to the movePlan (SINGLE disk)
-    movingPlan.unshift({ disk, toDisk: disk, fromRod, toRod });
+    // movingPlan.unshift({ disk, toDisk: disk, fromRod, toRod });
     
-    // --- DEBUG TRACING
-    console.log(`    First move: ${JSON.stringify(movingPlan[0])}`);
+    // // --- DEBUG TRACING
+    // console.log(`    First move: ${JSON.stringify(movingPlan[0])}`);
 
-    // update disk parameters after the first move
-    diskSlot++;
-    nDisks2Move--;
-    disk = this.rods[fromRod][diskSlot];
+    // // update disk parameters after the first move
+    // diskSlot++;
+    // nDisks2Move--;
+    // disk = this.rods[fromRod][diskSlot];
 
-    const validMoves = this.getValidMoves(disk, movingPlan);
+    // const validMoves = this.getValidMoves(disk, movingPlan);
     // --- DEBUG TRACING
     this.prnArrMoveDiskParams(validMoves, '    Array of Valid Moves:');
 
