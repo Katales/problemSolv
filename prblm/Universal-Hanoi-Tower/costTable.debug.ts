@@ -94,11 +94,32 @@ class GameBoard {
           typeof rodNProp !== "string" ||
           ! Number.isInteger(Number(rodNProp)) 
         ) return Reflect.get(costTable, rodNProp);
-        
 
+        const rodN = Number(rodNProp);
+        return new Proxy( this._costTable[rodN], { 
+          get: (costTableRod: number[], diskNProp: string | symbol) => {
+            if (
+              typeof diskNProp !== "string" ||
+              ! Number.isInteger(Number(diskNProp)) ||
+              costTableRod[Number(diskNProp)]
+            ) return Reflect.get(costTableRod, diskNProp);
+
+            const diskN: number = Number(diskNProp);
+            if ( 
+              rodN < 1 ||
+              diskN <= rodN ||
+              rodN === 1 && diskN > rodN
+            )
+              return Reflect.get(costTableRod, diskNProp);
+
+
+            this.getDiskDistr(rodN, diskN);
+
+            return Reflect.get(costTableRod, diskNProp)
+          } 
+        }) // end of INNER (diskN) proxy
       }
-
-    }) // outer (rodN) proxy
+    }) // end of OUTER (rodN) proxy
   }
 
   
@@ -129,7 +150,7 @@ class GameBoard {
 
   calculateCost(splitPtr: number[]): number {
     let cost: number = 0;
-    // console.log('calc.Costs :: SplitPtr:', splitPtr);
+    console.log('calc.Costs :: SplitPtr:', splitPtr);
     for ( let ind = 1 ; ind < splitPtr.length; ind++) {
       if ( this.costTable[ind][splitPtr[ind]] ) {
         // console.log(`   costTable[`,ind,`][`,splitPtr[ind],`] = `, costTable[ind][splitPtr[ind]])
@@ -146,8 +167,13 @@ class GameBoard {
   //   value - number of disks on
   // Also updates _costTable[avRods][nDisks] with minCost for minSplit
   getDiskDistr(avRods: number, nDisks: number): number[] {
-    
-    if ( this._splitsTable && this._splitsTable[avRods][nDisks].length )
+    console.log(`> getDiskDistr > avRods:${avRods}, nDisks:${nDisks} - splitsTable[avRods][nDisks]=`,this._splitsTable[avRods][nDisks]);
+    if (nDisks < 1 ) throw new Error('getDiskDistr,  nDisk < 1');
+    if ( 
+      this._splitsTable && 
+      this._splitsTable[avRods][nDisks] &&
+      this._splitsTable[avRods][nDisks].length 
+    )
       return [ ...this._splitsTable[avRods][nDisks] ];
 
     // find the distribution based on prev element beyond the Primitive one
@@ -168,24 +194,24 @@ class GameBoard {
       split[ind]--;
     };
     // check minimum if lowest distrib. element removed
-    if ( ! split[ind] ) ind++;
-    if ( ind < avRods ) {
-      split[ind+1] += split[ind];
-      split[ind] = 0;
-      const cost: number = this.calculateCost(split);
-      if (cost < minCost) {
-        console.log('This REALLY HAPPENED!!! minSplitPtr (', minSplit, minCost, ') -> ', split, cost);
-        minCost = cost;
-        minSplit = [...split];
-      }
-    }
+    // if ( ! split[ind] ) ind++;
+    // if ( ind < avRods ) {
+    //   split[ind+1] += split[ind] + 1;
+    //   split[ind] = 0;
+    //   const cost: number = this.calculateCost(split);
+    //   if (cost < minCost) {
+    //     console.log('This REALLY HAPPENED!!! minSplitPtr (', minSplit, minCost, ') -> ', split, cost);
+    //     minCost = cost;
+    //     minSplit = [...split];
+    //   }
+    // }
     
     // save minimal cost and split for diskCnt
     this._costTable[avRods][nDisks] = minCost;
     this._splitsTable[avRods][nDisks] = minSplit;
 
     // --- DEBUG
-    // console.log(`min Disk Distribution for ${nDisks} disks on ${avRods} rods = `, splitPtr);
+    console.log(`> getDiskDistr > min Disk Distribution for ${nDisks} disks on ${avRods} rods = `, minSplit, minCost);
     return [ ...minSplit];
   }
 
@@ -198,8 +224,8 @@ class GameBoard {
 // ====================== Harness - Part 2  =============================
 
 // ---------------------- Input Data ------------------------------
-const nRods: number = 6;
-const nDisks: number = 21;
+const nRods: number = 4;
+const nDisks: number = 5;
 
 // --- create posts array for GameBoard instantiation
 const posts: number[] = Array(nDisks).fill(1);
