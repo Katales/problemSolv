@@ -179,7 +179,7 @@ class GameBoard {
     this.prnArrMoveDiskParams(validMoves, '    Array of Valid Moves:');
 
     //Get the disk distribution for movingPlan
-    const diskDistr: number[] = this.getDiskDistr(nDisks2Move, avRods);
+    const diskDistr: number[] = this.getDiskDistr(avRods, nDisks2Move);
     console.log('    Disk distribution:', diskDistr); // --- DEBUG TRACING
 
     // build movingPlan
