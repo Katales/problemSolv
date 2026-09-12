@@ -90,6 +90,7 @@ class GameBoard {
         ) return Reflect.get(costTable, rodNProp);
 
         const rodN = Number(rodNProp);
+
         return new Proxy( this._costTable[rodN], { 
           get: (costTableRod: number[], diskNProp: string | symbol) => {
             if (
@@ -101,11 +102,18 @@ class GameBoard {
             const diskN: number = Number(diskNProp);
             if ( 
               rodN < 1 ||
-              diskN <= rodN ||
-              rodN === 1 && diskN > rodN
-            )
+              rodN >= this.nRods ||
+              rodN === 1 && diskN > 1 ||
+              diskN > this.nDisks ||
+              diskN <= rodN
+            ) {
               return Reflect.get(costTableRod, diskNProp);
+            };
 
+            if ( rodN === 2) {
+              const prevCost: number = costTableRod[diskN - 1];
+              costTableRod[diskN] = (prevCost) ? prevCost*2 + 1 : Math.pow(diskN, 2) - 1;
+            };
 
             this.getDiskDistr(rodN, diskN);
 
@@ -218,7 +226,7 @@ class GameBoard {
 
 // ---------------------- Input Data ------------------------------
 const nRods: number = 4;
-const nDisks: number = 5;
+const nDisks: number = 6;
 
 // --- create posts array for GameBoard instantiation
 const posts: number[] = Array(nDisks).fill(1);
