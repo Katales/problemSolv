@@ -15,12 +15,6 @@ type MoveDiskParams = {
   toRod: number;
 };
 
-type MoveOptParams = {
-  disk: number;
-  toRod: number;
-  childNode: MoveNode | null;
-};
-
 type MovingPlan = Array<MoveDiskParams>;
 
 type MoveRec = { 
@@ -167,51 +161,50 @@ class GameBoard {
   //   value - number of disks on
   // Also updates _costTable[avRods][nDisks] with minCost for minSplit
   getDiskDistr(avRods: number, nDisks: number): number[] {
-    console.log(`> getDiskDistr > avRods:${avRods}, nDisks:${nDisks} - splitsTable[avRods][nDisks]=`,this._splitsTable[avRods][nDisks]);
-    if (nDisks < 1 ) throw new Error('getDiskDistr,  nDisk < 1');
+    // --- DEBUG
+    console.log(`<- (IN) getDiskDistr: avRods:${avRods}, nDisks:${nDisks} - splitsTable[avRods][nDisks]=`,this._splitsTable[avRods][nDisks]);
+    if (nDisks < 1 || avRods < 2) 
+      throw new Error(`getDiskDistr: incorrect parameters! (avRods=${avRods}, nDisks=${nDisks}`);
+
     if ( 
-      this._splitsTable && 
       this._splitsTable[avRods][nDisks] &&
       this._splitsTable[avRods][nDisks].length 
     )
       return [ ...this._splitsTable[avRods][nDisks] ];
 
-    // find the distribution based on prev element beyond the Primitive one
-    // generate costs for disks avRods+1 .. nDisks (formula: min of all possible splits)
-    let split: number[] = this.getDiskDistr(avRods, nDisks - 1);
     let minCost: number = Number.MAX_SAFE_INTEGER;
-    let minSplit: number[] = [];
-    // try possible splits of diskCnt into avRods parts, and find the minimum cost
-    let ind = 0;
-    for (ind = avRods; ind > 1; ind--) {
-      if ( ! split[ind] ) break;
-      split[ind]++;
-      const cost: number = this.calculateCost(split);
-      if (cost < minCost) {
-        minCost = cost;
-        minSplit = [...split];
-      }
-      split[ind]--;
-    };
-    // check minimum if lowest distrib. element removed
-    // if ( ! split[ind] ) ind++;
-    // if ( ind < avRods ) {
-    //   split[ind+1] += split[ind] + 1;
-    //   split[ind] = 0;
-    //   const cost: number = this.calculateCost(split);
-    //   if (cost < minCost) {
-    //     console.log('This REALLY HAPPENED!!! minSplitPtr (', minSplit, minCost, ') -> ', split, cost);
-    //     minCost = cost;
-    //     minSplit = [...split];
-    //   }
-    // }
-    
-    // save minimal cost and split for diskCnt
-    this._costTable[avRods][nDisks] = minCost;
+    let minSplit: number[] = Array.from( {length: avRods + 1}, () => 0);
+
+    if ( avRods === 2 ) {
+      minSplit[2] = nDisks - 1;
+      minSplit[1] = 1;
+    } else {
+      // find the distribution based on prev element beyond the Primitive one
+      // generate costs for disks avRods+1 .. nDisks (formula: min of all possible splits)
+      let split: number[] = this.getDiskDistr(avRods, nDisks - 1);
+      
+      // try possible splits of diskCnt into avRods parts, and find the minimum cost
+      let ind = 0;
+      for (ind = avRods; ind > 1; ind--) {
+        if ( ! split[ind] ) break;
+        split[ind]++;
+        const cost: number = this.calculateCost(split);
+        if (cost < minCost) {
+          minCost = cost;
+          minSplit = [...split];
+        }
+        split[ind]--;
+      };
+
+      // save minimal cost 
+      this._costTable[avRods][nDisks] = minCost;
+    }
+
+    // save minimal split for diskCnt
     this._splitsTable[avRods][nDisks] = minSplit;
 
     // --- DEBUG
-    console.log(`> getDiskDistr > min Disk Distribution for ${nDisks} disks on ${avRods} rods = `, minSplit, minCost);
+    console.log(`-> (OUT) getDiskDistr: min Disk Distribution on ${avRods} rods, for ${nDisks} disks = `, minSplit, minCost);
     return [ ...minSplit];
   }
 
