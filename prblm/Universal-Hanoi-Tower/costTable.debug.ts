@@ -5,6 +5,7 @@ export {};
 
 // ================= Types & Classes =================
 type Disks = Array<number>;
+type Split = Array<number>;
 
 type CostTable = Array<Array<number>>;
 
@@ -32,11 +33,11 @@ class GameBoard {
   nRods: number;
   rods: Array<Disks>;
   // the Table of MIN costs for disk group moves (see method description, genCostTable)
-  _costTable: number[][]; // --- DEBUG return PRIVATE !!!!!!!!!!!
+  _costTable: CostTable; // --- DEBUG return PRIVATE !!!!!!!!!!!
   // Proxy for _costTable
-  private _costTableProxy: number[][]; 
+  private _costTableProxy: CostTable; 
   // splitsTable
-  private _splitsTable: number[][][];
+  private _splitsTable: Array<Array<Split>>;
 
   constructor(gState: number[], nRods: number) {
     if (!gState.length)
@@ -71,15 +72,14 @@ class GameBoard {
   }
 
   // GETTER: nDisks - number of disks on GameBoard
-  get nDisks() {
+  get nDisks(): number {
     return this.gState.length - 1; // minus dummy disk
   }
 
   // GETTER: costTable
-  get costTable() {
+  get costTable(): CostTable {
     return this._costTableProxy
   }
-
   
   initCostTableProxy(): number[][] {
     return new Proxy( this._costTable, {
@@ -150,7 +150,7 @@ class GameBoard {
   }
 
 
-  calculateCost(splitPtr: number[]): number {
+  calculateCost(splitPtr: Split): number {
     let cost: number = 0;
     for ( let ind = 1 ; ind < splitPtr.length; ind++) {
       if ( this.costTable[ind][splitPtr[ind]] ) {
@@ -180,7 +180,7 @@ class GameBoard {
       return [ ...this._splitsTable[avRods][nDisks] ];
 
     let minCost: number = Number.MAX_SAFE_INTEGER;
-    let minSplit: number[] = Array.from( {length: avRods + 1}, () => 0);
+    let minSplit: Split = Array.from( {length: avRods + 1}, () => 0);
 
     if ( avRods === 2 ) {
       minSplit[2] = nDisks - 1;
@@ -188,7 +188,7 @@ class GameBoard {
     } else {
       // find the distribution based on prev element beyond the Primitive one
       // generate costs for disks avRods+1 .. nDisks (formula: min of all possible splits)
-      let split: number[] = this.getDiskDistr(avRods, nDisks - 1);
+      let split: Split = this.getDiskDistr(avRods, nDisks - 1);
       
       // try possible splits of diskCnt into avRods parts, and find the minimum cost
       let ind = 0;

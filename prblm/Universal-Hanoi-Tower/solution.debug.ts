@@ -4,6 +4,7 @@
 
 // ================= Types & Classes =================
 type Disks = Array<number>;
+type Split = Array<number>;
 
 type CostTable = Array<Array<number>>;
 
@@ -38,7 +39,11 @@ class GameBoard {
   rods: Array<Disks>;
   moveTree: MoveTree;
   // the Table of MIN costs for disk group moves (see method description, genCostTable)
-  costTable: Array<Array<number>>;
+   _costTable: CostTable; // --- DEBUG return PRIVATE !!!!!!!!!!!
+  // Proxy for _costTable
+  private _costTableProxy: CostTable; 
+  // splitsTable
+  private _splitsTable: Array<Array<Split>>;
 
   constructor(gState: number[], nRods: number) {
     if (!gState.length)
@@ -66,14 +71,157 @@ class GameBoard {
       this.rods[rod]!.push(disk);
     }
 
-    //generate costTable
-    this.costTable = this.genCostTable(this.nDisks, this.nRods);
+    //initialize splitsTable
+    this._splitsTable = Array.from( { length: nRods }, () => [] as number[][] );
+    //initialize costTable
+    this._costTable = Array.from({ length: nRods }, () => [] as number[]);
+    this.fillCostDistrTables(nRods, this.nDisks);
+    this._costTableProxy = this.initCostTableProxy();
   }
 
   // GETTER: nDisks - number of disks on GameBoard
   get nDisks() {
     return this.gState.length - 1; // minus dummy disk
   }
+  
+  // GETTER: costTable
+  get costTable(): CostTable {
+    return this._costTableProxy
+  }
+  
+  initCostTableProxy(): number[][] {
+    return new Proxy( this._costTable, {
+      get: (costTable: number[][], rodNProp: string | symbol) => {
+        if (
+          typeof rodNProp !== "string" ||
+          ! Number.isInteger(Number(rodNProp)) 
+        ) return Reflect.get(costTable, rodNProp);
+
+        const rodN = Number(rodNProp);
+
+        return new Proxy( this._costTable[rodN], { 
+          get: (costTableRod: number[], diskNProp: string | symbol) => {
+            if (
+              typeof diskNProp !== "string" ||
+              ! Number.isInteger(Number(diskNProp)) ||
+              costTableRod[Number(diskNProp)]
+            ) return Reflect.get(costTableRod, diskNProp);
+
+            const diskN: number = Number(diskNProp);
+            if ( 
+              rodN < 1 ||
+              rodN >= this.nRods ||
+              rodN === 1 && diskN > 1 ||
+              diskN > this.nDisks ||
+              diskN <= rodN
+            ) {
+              return Reflect.get(costTableRod, diskNProp);
+            };
+
+            if ( rodN === 2) {
+              const prevCost: number = costTableRod[diskN - 1];
+              costTableRod[diskN] = (prevCost) ? prevCost*2 + 1 : Math.pow(2, diskN) - 1;
+            } else {
+              this.getDiskDistr(rodN, diskN);
+            };
+
+            return Reflect.get(costTableRod, diskNProp)
+          } 
+        }) // end of INNER (diskN) proxy
+      }
+    }) // end of OUTER (rodN) proxy
+  }
+
+  
+  // Populate `Base Distribution` elements of _costTable & _splitsTable
+  //   `Base Distribution` === costTable[rodN][diskN], where `rodN` is in [1..nRods-1], `diskN` is in [1..rodN]
+  // Structure of _costTable & _splitsTable
+  // first index:  `[1 .. nRods-1 ]` is the number of rods available for a group move.
+  //        `nRods-1` is the max. quantity of possible available rods
+  //        indexes `0` & `1` - dummy rods
+  // second index: is the number of disks in group move.
+  //        index `0` - dummy disk
+  // Value ( of _costTable element):
+  //   is the number of moves (cost) of moving that number of disks with that number of available rods
+  // Value ( of _splitsTable element): 
+  //   is the disk distribution split (vector) for the number of disks (second index)
+  fillCostDistrTables(nRods: number, nDisks: number) {
+    for ( let rodN = 1; rodN <= nRods - 1; rodN++) {
+      // `split` array's got a dummy rod 0 to access rod by it's number, that's why length = rodN + 1
+      const split: number[] = Array.from( { length: rodN + 1}, () => 0);
+      for ( let diskN = 1; diskN <= rodN; diskN++) {
+        this._costTable[rodN][diskN] = diskN*2 - 1;
+        split[split.length - diskN] = 1;
+        this._splitsTable[rodN][diskN] = [ ...split];
+      }
+    }
+  }
+
+
+  calculateCost(splitPtr: Split): number {
+    let cost: number = 0;
+    for ( let ind = 1 ; ind < splitPtr.length; ind++) {
+      if ( this.costTable[ind][splitPtr[ind]] ) {
+        cost += this.costTable[ind][splitPtr[ind]] * (cost ? 2 : 1); // multiply by 2 for all but the first part
+      }
+    }
+    // --- DEBUG 
+    // console.log(`>> CalculateCost: splitPtr=`, splitPtr, `cost=`, cost);
+    return cost;
+  }
+
+
+  // Provides disk dist. over available rods in a form of minSplit array, where:
+  //   ind. - rod number (as in the costTable) among available rods (it's not a rod number as in rods array!)
+  //   value - number of disks on
+  // Also updates _costTable[avRods][nDisks] with minCost for minSplit
+  getDiskDistr(avRods: number, nDisks: number): number[] {
+    if (nDisks < 1 || avRods < 2) 
+      throw new Error(`getDiskDistr: incorrect parameters! (avRods=${avRods}, nDisks=${nDisks}`);
+
+    // --- DEBUG
+    // console.log(`> getDiskDistr(avRods:${avRods}, nDisks: ${nDisks})`);
+    if ( 
+      this._splitsTable[avRods][nDisks] &&
+      this._splitsTable[avRods][nDisks].length 
+    )
+      return [ ...this._splitsTable[avRods][nDisks] ];
+
+    let minCost: number = Number.MAX_SAFE_INTEGER;
+    let minSplit: Split = Array.from( {length: avRods + 1}, () => 0);
+
+    if ( avRods === 2 ) {
+      minSplit[2] = nDisks - 1;
+      minSplit[1] = 1;
+    } else {
+      // find the distribution based on prev element beyond the Primitive one
+      // generate costs for disks avRods+1 .. nDisks (formula: min of all possible splits)
+      let split: Split = this.getDiskDistr(avRods, nDisks - 1);
+      
+      // try possible splits of diskCnt into avRods parts, and find the minimum cost
+      let ind = 0;
+      for (ind = avRods; ind > 1; ind--) {
+        if ( ! split[ind] ) break;
+        split[ind]++;
+        const cost: number = this.calculateCost(split);
+        if (cost < minCost) {
+          minCost = cost;
+          minSplit = [...split];
+        }
+        split[ind]--;
+      };
+
+      // save minimal cost 
+      this._costTable[avRods][nDisks] = minCost;
+    }
+
+    // save minimal split for diskCnt
+    this._splitsTable[avRods][nDisks] = minSplit;
+
+    return [ ...minSplit];
+  }
+
+
 
   isUpperDisk(disk: number): boolean {
     const rod: number = this.gState[disk];
@@ -234,138 +382,6 @@ class GameBoard {
     return this.moveTree.currNode.level - movesStart;
   }
 
-  // Provides disk dist. over available rods in a form of SplitPtr array, where:
-  // ind. - rod number (as in the costTable) among available rods (it's not a rod number as in rods array!)
-  // value - number of disks on
-  getDiskDistr(nDisks: number, avRods: number): number[] {
-    
-    //prepare splitPtr array for generating costs for disks avRods+1 .. nDisks
-    let splitPtr: number[] = Array(avRods + 1).fill(0);
-
-    // check if nDisks is less than the `number of disks in Base distribution`
-    const nDisksInBaseDistr: number = ((avRods - 1) * (avRods + 2)) / 2;
-
-
-    // Fill in splitPtr according to the `Primitive distribution`, where nDisks <= avRods
-    let diskCnt: number = 0;
-    for (let rodCol = avRods; rodCol > 0 && diskCnt < nDisks; rodCol--) {
-      splitPtr[rodCol]++;
-      diskCnt++;
-    }
-
-    if (nDisks <= avRods) {
-      return splitPtr;
-    }
-
-    // find the distribution beyond the Primitive one
-    // generate costs for disks avRods+1 .. nDisks (formula: min of all possible splits)
-    for (diskCnt = avRods + 1; diskCnt <= nDisks; diskCnt++) {
-      let minCost: number = Number.MAX_SAFE_INTEGER;
-      let minSplitPtr: number[] = [];
-      // try possible splits of diskCnt into avRods parts, and find the minimum cost
-      let ind = 0;
-      for (ind = avRods; ind > 1; ind--) {
-        if ( ! splitPtr[ind] ) break;
-        splitPtr[ind]++;
-        const cost: number = this.calculateCost(splitPtr);
-        if (cost < minCost) {
-          minCost = cost;
-          minSplitPtr = [...splitPtr];
-        }
-        splitPtr[ind]--;
-      };
-
-      // check minimum if lowest distrib. element removed
-      if ( ! splitPtr[ind] ) ind++;
-      if ( ind < avRods ) {
-        const tmpSplitPtr: number[] = [ ...minSplitPtr];
-        tmpSplitPtr[ind+1] += tmpSplitPtr[ind];
-        tmpSplitPtr[ind] = 0;
-        const cost: number = this.calculateCost(minSplitPtr);
-        if (cost < minCost) {
-          console.log('This REALLY HAPPENED!!! minSplitPtr (', minSplitPtr, minCost, ') -> ', tmpSplitPtr, cost);
-          minCost = cost;
-          minSplitPtr = [...tmpSplitPtr];
-        }
-      }
-      
-      // save minimal cost and split pointer for diskCnt
-      splitPtr = [...minSplitPtr];
-    }
-
-    // --- DEBUG
-    // console.log(`min Disk Distribution for ${nDisks} disks on ${avRods} rods = `, splitPtr);
-
-    return splitPtr;
-  }
-
-  // Generate the Table of MIN Costs for disk group moves
-  // first index:  `[2 .. nRods-1 ]` is the number of rods available for a group move.
-  //        `nRods-1` is the max. quantity of possible available rods
-  //        indexes `0` & `1` - dummy rods
-  // second index: is the number of disks in group move.
-  //        index `0` - dummy disk
-  // Value is the number of moves (cost) of moving that number of disks with that number of available rods
-  genCostTable(nDisks: number, nRods: number): Array<Array<number>> {
-    const costTable: CostTable = Array.from({ length: nRods }, () => [] as number[]);
-
-    // one elem. for 1 rod 
-    costTable[1][1] = 1;
-
-    // generate costs for 2 rods (the classic Tower of Hanoi problem)
-    costTable[2][1] = 1;
-    for (let diskCnt = 2; diskCnt <= nDisks; diskCnt++)
-      costTable[2][diskCnt] = costTable[2][diskCnt - 1] * 2 + 1;
-
-    // generate costs for (3 .. nRods-1) rods
-    for (let avRods = 3; avRods <= nRods - 1; avRods++) {
-      // generate costs for disks 1 .. avRods (formula: diskCnt * 2 - 1)
-      for (let diskCnt = 1; diskCnt <= avRods; diskCnt++) {
-        costTable[avRods][diskCnt] = diskCnt * 2 - 1;
-      }
-
-      //prepare splitPtr array for generating costs for disks avRods+1 .. nDisks
-      let splitPtr: number[] = Array.from({ length: avRods + 1 }, () => 0);
-      for (let i = 0; i <= avRods - 1; i++) {
-        const ind = (i % (avRods - 1)) + 2; //add 2 to convert to avRods index in costTable
-        splitPtr[ind]++;
-      }
-      // generate costs for disks avRods+1 .. nDisks (formula: min of all possible splits)
-      for (let diskCnt = avRods + 1; diskCnt <= nDisks; diskCnt++) {
-        let minCost: number = Number.MAX_SAFE_INTEGER;
-        let minSplitPtr: number[] = [];
-        // try possible splits of diskCnt into avRods parts, and find the minimum cost
-        for (let ind = 2; ind <= avRods; ind++) {
-          const tmpSplitPtr = [...splitPtr];
-          tmpSplitPtr[ind]++;
-          const tmpMinCost = this.calculateCost(tmpSplitPtr, costTable);
-          if (tmpMinCost < minCost) {
-            minCost = tmpMinCost;
-            minSplitPtr = [...tmpSplitPtr];
-          }
-        }
-        // save minimal cost and split pointer for diskCnt
-        costTable[avRods][diskCnt] = minCost;
-        splitPtr = [...minSplitPtr];
-      }
-    }
-
-    return costTable;
-  }
-
-  calculateCost(splitPtr: number[], costTable: CostTable = this.costTable ): number {
-    let cost: number = 0;
-    // console.log('calc.Costs :: SplitPtr:', splitPtr);
-    for ( let ind = 1 ; ind < splitPtr.length; ind++) {
-      if ( costTable[ind][splitPtr[ind]] ) {
-        // console.log(`   costTable[`,ind,`][`,splitPtr[ind],`] = `, costTable[ind][splitPtr[ind]])
-        cost += costTable[ind][splitPtr[ind]] * (cost ? 2 : 1); // multiply by 2 for all but the first part
-      }
-    }
-    // console.log('cost =', cost);
-    return cost;
-  }
-
   // --- DEBUG TRACING
   prnArrMoveDiskParams(arrMoveDiskParams: MoveDiskParams[], msg: string = '') {
     console.log(msg);
@@ -512,22 +528,21 @@ class MoveNode {
 
 // ---------------------- Input Data ------------------------------
 const nRods: number = 6;
-const nDisks: number = 21;
+const nDisks: number = 20;
 
 // --- create posts array for GameBoard instantiation
 const posts: number[] = Array(nDisks).fill(1);
-
 const gBoard = new GameBoard(posts, nRods); // Example initialization with 4 disks on rod 1
 
 console.log(`Initial state of rods: ${gBoard.gState}`);
-printCostTable(gBoard);
-
 console.log(
   // --- DEBUG TRACING
   `Number of moves: ${gBoard.moveDiskAll({ disk: nDisks, toDisk: 1, fromRod: 1, toRod: 2 })} `,
 );
 
-printMoveRecords(gBoard.moveTree);
+// printMoveRecords(gBoard.moveTree);
+print_costTable(gBoard);
+
 
 // Prints Cost Table
 function printCostTable(gBoard: GameBoard): void {
@@ -543,6 +558,22 @@ function printCostTable(gBoard: GameBoard): void {
     console.log(values.join('\t'));
   }
 }
+
+// Prints _costTable
+function print_costTable(gBoard: GameBoard): void {
+  const firstColumn = 1;
+
+  for (let row = 0; row <= gBoard.nDisks; row++) {
+    const values: number[] = [];
+
+    for (let column = firstColumn; column < gBoard._costTable.length; column++) {
+      values.push(gBoard._costTable[column][row]);
+    }
+
+    console.log(values.join('\t'));
+  }
+};
+
 
 // Prints the move tree's records: initial state, then each move with its resulting gState
 function printMoveRecords(moveTree: MoveTree): void {
