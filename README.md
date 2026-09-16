@@ -5,7 +5,7 @@ written in TypeScript by default with a JavaScript fallback.
 
 ## Structure
 
-- `prblms/` — solved problems, one folder per problem
+- `prblm/` — solved problems, one folder per problem
 - `templ/` — starter templates (`prblm-templ-ts`, `prblm-templ-js`)
 - `scripts/` — tooling (problem scaffolding, etc.)
 
@@ -19,4 +19,4 @@ Run all tests:
 `npm run test:all`
 
 Run tests for one problem:
-`npm test -- prblms/problem-dir/`
+`npm test -- prblm/problem-dir/`
