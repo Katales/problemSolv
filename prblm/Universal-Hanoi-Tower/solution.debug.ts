@@ -218,8 +218,6 @@ class GameBoard {
     return [ ...minSplit];
   }
 
-
-
   isUpperDisk(disk: number): boolean {
     const rod: number = this.gState[disk];
     return this.rods[rod]!.at(-1) === disk;
@@ -524,12 +522,12 @@ class MoveNode {
 // ====================== Harness - Part 2  =============================
 
 // ---------------------- Input Data ------------------------------
-const nRods: number = 6;
-const nDisks: number = 20;
+const nRods: number = 4;
+const nDisks: number = 10;
 
 // --- create posts array for GameBoard instantiation
 const posts: number[] = Array(nDisks).fill(1);
-const gBoard = new GameBoard(posts, nRods); // Example initialization with 4 disks on rod 1
+const gBoard = new GameBoard(posts, nRods);
 
 console.log(`Initial state of rods: ${gBoard.gState}`);
 console.log(

@@ -1,10 +1,12 @@
-('use strict');
-
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // The solution (exported for testing purposes)
-export function hanoi(nDisks: number, nRods: number = 3): number {
-  // ================= Types & Classes =================
+export function hanoi(nRods: number = 3, nDisks: number ): number {
+
+  // ================= Types =================
   type Disks = Array<number>;
+  type Split = Array<number>;
+
+  type CostTable = Array<Array<number>>;
 
   type MoveDiskParams = {
     disk: number;
@@ -21,6 +23,12 @@ export function hanoi(nDisks: number, nRods: number = 3): number {
 
   type MovingPlan = Array<MoveDiskParams>;
 
+  type MoveRec = { 
+    movePar?: MoveDiskParams, 
+    gState: number[] 
+  };
+
+  // ================= Classes =================
   // --- **class GameBoard** --- represents the state of the rods and disks in the Tower of Hanoi problem.
   // It maintains the state in two structures:
   // 1. rods: An array where each index represents a rod and contains an array of disks on that rod.
@@ -31,11 +39,16 @@ export function hanoi(nDisks: number, nRods: number = 3): number {
     nRods: number;
     rods: Array<Disks>;
     moveTree: MoveTree;
-    // the Table of MIN costs for disk group moves (see method description, genCostTable)
-    costTable: Array<Array<number>>;
+    // the Table of MIN costs for disk group moves (see method description of fillCostDistrTables())
+    // costTable: CostTable; --- GETTER
+    private _costTable: CostTable;
+    // Proxy for _costTable
+    private _costTableProxy: CostTable; 
+    // splitsTable
+    private _splitsTable: Array<Array<Split>>;
 
     constructor(gState: number[], nRods: number) {
-      if (!this.gState.length)
+      if (!gState.length)
         throw new Error(
           `Cannot create GameBoard with given gState (posts) array. gState.length=${gState.length}`,
         );
@@ -60,13 +73,148 @@ export function hanoi(nDisks: number, nRods: number = 3): number {
         this.rods[rod]!.push(disk);
       }
 
-      //generate costTable
-      this.costTable = this.genCostTable(this.nDisks, this.nRods);
+      //initialize splitsTable
+      this._splitsTable = Array.from( { length: nRods }, () => [] as number[][] );
+      //initialize costTable
+      this._costTable = Array.from({ length: nRods }, () => [] as number[]);
+      this.fillCostDistrTables(nRods, this.nDisks);
+      this._costTableProxy = this.initCostTableProxy();
     }
 
     // GETTER: nDisks - number of disks on GameBoard
     get nDisks() {
       return this.gState.length - 1; // minus dummy disk
+    }
+    
+    // GETTER: costTable
+    get costTable(): CostTable {
+      return this._costTableProxy
+    }
+
+    initCostTableProxy(): number[][] {
+      return new Proxy( this._costTable, {
+        get: (costTable: number[][], rodNProp: string | symbol) => {
+          if (
+            typeof rodNProp !== "string" ||
+            ! Number.isInteger(Number(rodNProp)) 
+          ) return Reflect.get(costTable, rodNProp);
+
+          const rodN = Number(rodNProp);
+
+          return new Proxy( this._costTable[rodN], { 
+            get: (costTableRod: number[], diskNProp: string | symbol) => {
+              if (
+                typeof diskNProp !== "string" ||
+                ! Number.isInteger(Number(diskNProp)) ||
+                costTableRod[Number(diskNProp)]
+              ) return Reflect.get(costTableRod, diskNProp);
+
+              const diskN: number = Number(diskNProp);
+              if ( 
+                rodN < 1 ||
+                rodN >= this.nRods ||
+                rodN === 1 && diskN > 1 ||
+                diskN > this.nDisks ||
+                diskN <= rodN
+              ) {
+                return Reflect.get(costTableRod, diskNProp);
+              };
+
+              if ( rodN === 2) {
+                const prevCost: number = costTableRod[diskN - 1];
+                costTableRod[diskN] = (prevCost) ? prevCost*2 + 1 : Math.pow(2, diskN) - 1;
+              } else {
+                this.getDiskDistr(rodN, diskN);
+              };
+
+              return Reflect.get(costTableRod, diskNProp)
+            } 
+          }) // end of INNER (diskN) proxy
+        }
+      }) // end of OUTER (rodN) proxy
+    }
+    
+    // Populate `Base Distribution` elements of _costTable & _splitsTable
+    //   `Base Distribution` === costTable[rodN][diskN], where `rodN` is in [1..nRods-1], `diskN` is in [1..rodN]
+    // Structure of _costTable & _splitsTable
+    // first index:  `[1 .. nRods-1 ]` is the number of rods available for a group move.
+    //        `nRods-1` is the max. quantity of possible available rods
+    //        indexes `0` & `1` - dummy rods
+    // second index: is the number of disks in group move.
+    //        index `0` - dummy disk
+    // Value ( of _costTable element):
+    //   is the number of moves (cost) of moving that number of disks with that number of available rods
+    // Value ( of _splitsTable element): 
+    //   is the disk distribution split (vector) for the number of disks (second index)
+    fillCostDistrTables(nRods: number, nDisks: number) {
+      for ( let rodN = 1; rodN <= nRods - 1; rodN++) {
+        // `split` array's got a dummy rod 0 to access rod by it's number, that's why length = rodN + 1
+        const split: number[] = Array.from( { length: rodN + 1}, () => 0);
+        for ( let diskN = 1; diskN <= rodN; diskN++) {
+          this._costTable[rodN][diskN] = diskN*2 - 1;
+          split[split.length - diskN] = 1;
+          this._splitsTable[rodN][diskN] = [ ...split];
+        }
+      }
+    }
+
+    calculateCost(splitPtr: Split): number {
+      let cost: number = 0;
+      for ( let ind = 1 ; ind < splitPtr.length; ind++) {
+        if ( this.costTable[ind][splitPtr[ind]] ) {
+          cost += this.costTable[ind][splitPtr[ind]] * (cost ? 2 : 1); // multiply by 2 for all but the first part
+        }
+      };
+
+      return cost;
+    }
+
+    // Provides disk dist. over available rods in a form of minSplit array, where:
+    //   ind. - rod number (as in the costTable) among available rods (it's not a rod number as in rods array!)
+    //   value - number of disks on
+    // Also updates _costTable[avRods][nDisks] with minCost for minSplit
+    getDiskDistr(avRods: number, nDisks: number): number[] {
+      if (nDisks < 1 || avRods < 2) 
+        throw new Error(`getDiskDistr: incorrect parameters! (avRods=${avRods}, nDisks=${nDisks}`);
+
+      if ( 
+        this._splitsTable[avRods][nDisks] &&
+        this._splitsTable[avRods][nDisks].length 
+      )
+        return [ ...this._splitsTable[avRods][nDisks] ];
+
+      let minCost: number = Number.MAX_SAFE_INTEGER;
+      let minSplit: Split = Array.from( {length: avRods + 1}, () => 0);
+
+      if ( avRods === 2 ) {
+        minSplit[2] = nDisks - 1;
+        minSplit[1] = 1;
+      } else {
+        // find the distribution based on prev element beyond the Primitive one
+        // generate costs for disks avRods+1 .. nDisks (formula: min of all possible splits)
+        let split: Split = this.getDiskDistr(avRods, nDisks - 1);
+        
+        // try possible splits of diskCnt into avRods parts, and find the minimum cost
+        let ind = 0;
+        for (ind = avRods; ind > 1; ind--) {
+          if ( ! split[ind] ) break;
+          split[ind]++;
+          const cost: number = this.calculateCost(split);
+          if (cost < minCost) {
+            minCost = cost;
+            minSplit = [...split];
+          }
+          split[ind]--;
+        };
+
+        // save minimal cost 
+        this._costTable[avRods][nDisks] = minCost;
+      }
+
+      // save minimal split for diskCnt
+      this._splitsTable[avRods][nDisks] = minSplit;
+
+      return [ ...minSplit];
     }
 
     isUpperDisk(disk: number): boolean {
@@ -85,9 +233,9 @@ export function hanoi(nDisks: number, nRods: number = 3): number {
       return this.rods[this.gState[disk]].indexOf(disk);
     }
 
-    // is `moveParams` represent a valid move
+    // Is `movePar` represent a valid move, NOT checking if `disk` is the upper disk
     // `exclMovingPlan` is optional
-    // returns
+    // returns: boolean
     isValidMove(movePar: MoveDiskParams, exclMovingPlan: MovingPlan = []): boolean {
       let { disk, fromRod, toRod } = movePar;
       if (!fromRod) fromRod = this.gState[disk];
@@ -102,10 +250,10 @@ export function hanoi(nDisks: number, nRods: number = 3): number {
       return false;
     }
 
-    getValidMoves(
-      disk: number = this.nDisks,
-      exclMovingPlan: MovingPlan = [],
-    ): Array<MoveDiskParams> {
+    // Build array of valid moves, NOT checking if `disk` is the upper disk
+    // using `this.isValidMove();
+    // returns: array of valid moves
+    getValidMoves( disk: number = this.nDisks, exclMovingPlan: MovingPlan = [] ): Array<MoveDiskParams> {
       const validMoves: Array<MoveDiskParams> = [];
       for (let toRod = 1; toRod < this.rods.length; toRod++) {
         if (this.isValidMove({ disk, toRod }, exclMovingPlan)) validMoves.push({ disk, toRod });
@@ -121,15 +269,14 @@ export function hanoi(nDisks: number, nRods: number = 3): number {
       if (!(this.isValidMove(movePar) && this.isUpperDisk(movePar.disk))) return 0;
 
       // move the disk
-      this.rods[movePar.fromRod]!.pop();
-      this.rods[movePar.toRod]!.push(movePar.disk);
+      this.rods[movePar.toRod]!.push(this.rods[movePar.fromRod]!.pop()!);
       this.gState[movePar.disk] = movePar.toRod;
 
       return this.moveTree.logMove(movePar) ? 1 : 0;
     }
 
     // Move specified `disk` and ALL disks above it to a `toRod`
-    //returns: number of moves, 0 - move isn't possible
+    // returns: number of moves, 0 - move isn't possible
     moveDiskAll(movePar: MoveDiskParams): number {
       if (!this.isValidMove(movePar)) return 0;
       let { disk, toDisk, fromRod, toRod } = movePar;
@@ -139,160 +286,66 @@ export function hanoi(nDisks: number, nRods: number = 3): number {
 
       const movesStart: number = this.moveTree.currNode.level;
       const movingPlan: MovingPlan = [];
-      const avRods: number = this.getValidMoves(disk).length;
+      let validMoves: Array<MoveDiskParams> = this.getValidMoves(disk);
+      const avRods: number = validMoves.length;
+
       if (avRods < 2) throw new Error("Number of available rods is below 2 - can't proceed!");
 
       let diskSlot = this.getDiskSlot(disk);
       let nDisks2Move: number = this.rods[fromRod].length - diskSlot;
 
-      // add the first item to the movePlan (SINGLE disk)
-      movingPlan.unshift({ disk, toDisk: disk, fromRod, toRod });
+      //Get the disk distribution for movingPlan
+      const diskDistr: number[] = this.getDiskDistr(avRods, nDisks2Move);
 
-      // plan the moves of upper disks
-      diskSlot++;
-      nDisks2Move--;
-      disk = this.rods[fromRod][diskSlot];
-      const validMoves = this.getValidMoves(disk, movingPlan);
+      // build movingPlan
+      for (let i = 1; i < diskDistr.length; i++) {
+        if (diskDistr[i] === 0) continue;
+        toDisk = this.rods[fromRod][diskSlot + diskDistr[i] - 1];
+        
+        if ( movingPlan.length === 0) {
+          // if first move in movingPlan
+          movingPlan.unshift({
+            disk,
+            toDisk,
+            fromRod,
+            toRod,
+          });
+          validMoves = this.getValidMoves(disk, movingPlan);
+        } else {
+          // rest of moves
+          const tmpToRod: number = validMoves.shift()!.toRod;
+          // move part of disks to one of available rods
+          movingPlan.unshift({
+            disk,
+            toDisk,
+            fromRod,
+            toRod: tmpToRod,
+          });
 
-      //Get the disk distribution for multiple-disk move & add plan records
-      const diskDistr: number[] = this.getDiskDistr(nDisks2Move, avRods);
-      for (let i = 2; i < diskDistr.length - 1; i++) {
-        const tmpToRod: number = validMoves[i - 2].toRod;
-        // move part of disks to one of available rods
-        movingPlan.unshift({
-          disk,
-          toDisk: this.rods[fromRod][diskSlot + diskDistr[i] - 1],
-          fromRod,
-          toRod: tmpToRod,
-        });
+          // move that same part of disks to destination rod after single disk move
+          movingPlan.push({
+            disk,
+            toDisk,
+            fromRod: tmpToRod,
+            toRod,
+          });
+        }
 
-        // move that same part of disks to destination rod after single disk move
-        movingPlan.push({
-          disk,
-          toDisk: this.rods[fromRod][diskSlot + diskDistr[i] - 1],
-          fromRod: tmpToRod,
-          toRod,
-        });
+        // update disk parameters after the move
+        diskSlot += diskDistr[i];
+        nDisks2Move -= diskDistr[i];
+        if (nDisks2Move) disk = this.rods[fromRod][diskSlot];
       }
 
-      // Execute the Plan !
+      // Execute the movingPlan
       for (const movePlanEl of movingPlan) {
         if (!this.moveDiskAll(movePlanEl))
-          throw new Error("Invalid move in the movingPlan - Panic mode's ON!!!");
+          throw new Error("Invalid move in the movingPlan - PANIC !!!");
       }
 
       return this.moveTree.currNode.level - movesStart;
     }
 
-    // Provides disk dist. over available rods in a form of SplitPtr array, where:
-    // ind. - rod number (as in the costTable) among available rods (it's not a rod number as in rods array!)
-    // value - number of disks on
-    getDiskDistr(nDisks: number, avRods: number): number[] {
-      let diskCnt: number = 0;
-      //prepare splitPtr array for generating costs for disks avRods+1 .. nDisks
-      let splitPtr: number[] = Array.from({ length: avRods + 1 }, () => 0);
-
-      // check if nDisks is less than the `number of disks in Base distribution`
-      const nDisksInBaseDistr: number = ((avRods - 1) * (avRods + 2)) / 2;
-      if (nDisks < nDisksInBaseDistr) {
-        // Yes - fill in splitPtr according to the `Base distribution`
-        for (let diskRow = 1; diskRow <= avRods && diskCnt < nDisks; diskRow++) {
-          for (
-            let rodCol = avRods;
-            rodCol >= 2 && rodCol >= diskRow && diskCnt < nDisks;
-            rodCol--
-          ) {
-            splitPtr[rodCol]++;
-            diskCnt++;
-          }
-        }
-        return splitPtr;
-      }
-
-      // fill in splitPtr as a `Base distribution`
-      for (let ind = 2; ind <= avRods; ind++) splitPtr[ind] = ind;
-      if (nDisks === nDisksInBaseDistr) return splitPtr;
-
-      // find the distribution beyond the Base one
-      // generate costs for disks avRods+1 .. nDisks (formula: min of all possible splits)
-      for (diskCnt = nDisksInBaseDistr + 1; diskCnt <= nDisks; diskCnt++) {
-        let minInc: number = Number.MAX_SAFE_INTEGER;
-        let minSplitPtr: number[] = [];
-        // try possible splits of diskCnt into avRods parts, and find the minimum cost
-        for (let ind = 2; ind <= avRods; ind++) {
-          splitPtr[ind]++;
-          const inc = this.costTable[ind][splitPtr[ind]];
-          if (inc < minInc) {
-            minInc = inc;
-            minSplitPtr = [...splitPtr];
-          }
-          splitPtr[ind]--;
-        }
-        // save minimal cost and split pointer for diskCnt
-        splitPtr = [...minSplitPtr];
-      }
-
-      return splitPtr;
-    }
-
-    // Generate the Table of MIN Costs for disk group moves
-    // first index:  `[2 .. nRods-1 ]` is the number of rods available for a group move.
-    //        `nRods-1` is the max. quantity of possible available rods
-    //        indexes `0` & `1` - dummy rods
-    // second index: is the number of disks in group move.
-    //        index `0` - dummy disk
-    // Value is the number of moves (cost) of moving that number of disks with that number of available rods
-    genCostTable(nDisks: number, nRods: number): Array<Array<number>> {
-      const costTable: Array<Array<number>> = Array.from({ length: nRods }, () => [] as number[]);
-
-      // generate costs for 2 rods (the classic Tower of Hanoi problem)
-      costTable[2][1] = 1;
-      for (let diskCnt = 2; diskCnt <= nDisks; diskCnt++)
-        costTable[2][diskCnt] = costTable[2][diskCnt - 1] * 2 + 1;
-
-      // generate costs for (3 .. nRods-1) rods
-      for (let avRods = 3; avRods <= nRods - 1; avRods++) {
-        // generate costs for disks 1 .. avRods (formula: diskCnt * 2 - 1)
-        for (let diskCnt = 1; diskCnt <= avRods; diskCnt++) {
-          costTable[avRods][diskCnt] = diskCnt * 2 - 1;
-        }
-
-        //prepare splitPtr array for generating costs for disks avRods+1 .. nDisks
-        let splitPtr: number[] = Array.from({ length: avRods + 1 }, () => 0);
-        for (let i = 0; i <= avRods - 1; i++) {
-          const ind = (i % (avRods - 1)) + 2; //add 2 to convert to avRods index in costTable
-          splitPtr[ind]++;
-        }
-        // generate costs for disks avRods+1 .. nDisks (formula: min of all possible splits)
-        for (let diskCnt = avRods + 1; diskCnt <= nDisks; diskCnt++) {
-          let minCost: number = Number.MAX_SAFE_INTEGER;
-          let minSplitPtr: number[] = [];
-          // try possible splits of diskCnt into avRods parts, and find the minimum cost
-          for (let ind = 2; ind <= avRods; ind++) {
-            const tmpSplitPtr = [...splitPtr];
-            tmpSplitPtr[ind]++;
-            const tmpMinCost = calculateCost(tmpSplitPtr);
-            if (tmpMinCost < minCost) {
-              minCost = tmpMinCost;
-              minSplitPtr = [...tmpSplitPtr];
-            }
-          }
-          // save minimal cost and split pointer for diskCnt
-          costTable[avRods][diskCnt] = minCost;
-          splitPtr = [...minSplitPtr];
-        }
-      }
-
-      function calculateCost(splitPtr: number[]): number {
-        let cost: number = 0;
-        for (let ind = 2; ind <= splitPtr.length - 1; ind++) {
-          cost += costTable[ind][splitPtr[ind]] * (ind === 2 ? 1 : 2); // multiply by 2 for all but the first part
-        }
-        return cost;
-      }
-
-      return costTable;
-    }
   } // --- class GameBoard ---
 
   // --- **class MoveTree** --- define the structure of every node in a the tree/sequence of moves (in the Tower of Hanoi).
@@ -315,10 +368,35 @@ export function hanoi(nDisks: number, nRods: number = 3): number {
     logMove(moveDiskPar: MoveDiskParams): boolean {
       const newMoveNode: MoveNode | null = this.currNode.logMove(moveDiskPar, this.gBoard.gState);
       if (!newMoveNode) throw new Error("MoveNode can't be created. Abort!");
+      this.currNode = newMoveNode;
       return true;
     }
-  }
-  // --- class MoveTree ---
+
+    getMoveRecords(): Array<MoveRec> {
+      const moveRecords: Array<MoveRec> = [{ gState: this.topNode.gState }];
+
+      let node: MoveNode = this.topNode;
+      let firstKey = Object.keys(node.moveOpts).shift();
+      while (firstKey !== undefined) {
+        const moveOpt: MoveOptParams = node.moveOpts[Number(firstKey)];
+        if (!moveOpt.childNode) throw new Error("moveOpt has no childNode. Abort!");
+
+        moveRecords.push({
+          movePar: {
+            disk: moveOpt.disk,
+            toRod: moveOpt.toRod,
+            fromRod: node.gState[moveOpt.disk],
+          },
+          gState: moveOpt.childNode.gState,
+        });
+
+        node = moveOpt.childNode;
+        firstKey = Object.keys(node.moveOpts).shift();
+      }
+
+      return moveRecords;
+    }
+  } // --- class MoveTree ---
 
   // --- **class MoveNode** ---
   // Obects of this class constitute the moveTree
@@ -342,9 +420,8 @@ export function hanoi(nDisks: number, nRods: number = 3): number {
       // check: toRod !== `current rod`
       if (toRod === this.gState[disk]) return null; // no point when toRod === fromRod
       // check move doesn't exist in moveOpts
-      for (let moveInd = 0; moveInd < Object.keys(this.moveOpts).length; moveInd++) {
-        if (this.moveOpts[moveInd].disk === disk && this.moveOpts[moveInd].toRod === toRod)
-          return null;
+      for (const moveOpt of this.moveOpts) {
+        if (moveOpt.disk === disk && moveOpt.toRod === toRod) return null;
       }
 
       this.moveOpts.push({
@@ -400,8 +477,14 @@ export function hanoi(nDisks: number, nRods: number = 3): number {
     }
   } // --- class MoveNode ---
 
-  // ================= End of Types & Classes =================
-  const posts: number[] = Array.from({ length: nDisks }, () => 1);
+  // ================= hanoi() body =================
+  if (
+    nRods < 3 ||
+    nDisks < 1
+  )
+    return 0;  // incorrect parameters!
+
+  const posts: number[] = Array(nDisks).fill(1);
   const gBoard: GameBoard = new GameBoard(posts, nRods);
 
   return gBoard.moveDiskAll({ disk: nDisks, toDisk: 1, fromRod: 1, toRod: 2 });
