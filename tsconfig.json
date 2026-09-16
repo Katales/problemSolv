@@ -13,5 +13,5 @@
     "types": ["node"],
     "allowImportingTsExtensions": true
   },
-  "include": ["prblms/**/*"]
+  "include": ["prblm/**/*"]
 }

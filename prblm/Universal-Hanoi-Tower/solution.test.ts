@@ -5,3 +5,8 @@ import { hanoi } from './solution.ts';
 test('basic case', () => {
   assert.equal(hanoi([1, 2, 3]), 4);
 });
+
+// Rods	nDisks	Optimal moves
+// 4	    10	    49
+// 5	    15	    71
+// 6	    21	    97
