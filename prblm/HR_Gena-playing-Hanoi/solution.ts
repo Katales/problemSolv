@@ -529,6 +529,5 @@ function main() {
     const res: number = hanoi(loc);
 
     ws.write(res + '\n');
-
     ws.end();
 }
