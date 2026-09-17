@@ -77,7 +77,7 @@ export function hanoi(nRods: number = 3, nDisks: number ): number {
       this._splitsTable = Array.from( { length: nRods }, () => [] as number[][] );
       //initialize costTable
       this._costTable = Array.from({ length: nRods }, () => [] as number[]);
-      this.fillCostDistrTables(nRods, this.nDisks);
+      this.fillCostDistrTables(nRods);
       this._costTableProxy = this.initCostTableProxy();
     }
 
@@ -146,7 +146,7 @@ export function hanoi(nRods: number = 3, nDisks: number ): number {
     //   is the number of moves (cost) of moving that number of disks with that number of available rods
     // Value ( of _splitsTable element): 
     //   is the disk distribution split (vector) for the number of disks (second index)
-    fillCostDistrTables(nRods: number, nDisks: number) {
+    fillCostDistrTables(nRods: number) {
       for ( let rodN = 1; rodN <= nRods - 1; rodN++) {
         // `split` array's got a dummy rod 0 to access rod by it's number, that's why length = rodN + 1
         const split: number[] = Array.from( { length: rodN + 1}, () => 0);
@@ -229,7 +229,7 @@ export function hanoi(nRods: number = 3, nDisks: number ): number {
     // Get `disk's` index on a specified `rod`
     // returns: index of a disk in rods[rod][], -1 - if not found, 0 - if arguments are incorrect
     getDiskSlot(disk: number) {
-      if (disk < 1 || disk > nDisks || !this.rods[this.gState[disk]]) return 0;
+      if (disk < 1 || disk > this.nDisks || !this.rods[this.gState[disk]]) return 0;
       return this.rods[this.gState[disk]].indexOf(disk);
     }
 
