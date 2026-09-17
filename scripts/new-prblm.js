@@ -26,7 +26,7 @@ if (name !== rawName) {
 }
 
 const template = useJs ? 'prblm-templ-js' : 'prblm-templ-ts';
-const dest = join('prblms', name);
+const dest = join('prblm', name);
 
 if (existsSync(dest)) {
   console.error(`Folder already exists: ${dest}`);
