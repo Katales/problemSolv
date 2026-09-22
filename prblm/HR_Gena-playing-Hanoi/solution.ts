@@ -204,7 +204,7 @@ export function hanoi(posts: number[]): number {
         //   ind. - rod number (as in the costTable) among available rods (it's not a rod number as in rods array!)
         //   value - number of disks on
         // Also updates _costTable[avRods][nDisks] with minCost for minSplit
-        getDiskDistr(avRods: number, nDisks: number): number[] {
+        getDiskDistrM(avRods: number, nDisks: number): Array<Split> {
             if (nDisks < 1 || avRods < 2) 
                 throw new Error(`getDiskDistr: incorrect parameters! (avRods=${avRods}, nDisks=${nDisks}`);
 
@@ -212,30 +212,37 @@ export function hanoi(posts: number[]): number {
                 this._splitsTable[avRods][nDisks] &&
                 this._splitsTable[avRods][nDisks].length 
             )
-                return [ ...this._splitsTable[avRods][nDisks] ];
+                return [ [ ...this._splitsTable[avRods][nDisks] ] ];
 
             let minCost: number = Number.MAX_SAFE_INTEGER;
-            let minSplit: Split = Array.from( {length: avRods + 1}, () => 0);
+            let minSplitInd: number = 0;
+            let minSplitArr: Array<Split>;
 
             if ( avRods === 2 ) {
-                minSplit[2] = nDisks - 1;
-                minSplit[1] = 1;
+                minSplitArr = [ Array.from( {length: avRods + 1}, () => 0) ];
+                minSplitArr[minSplitInd][2] = nDisks - 1;
+                minSplitArr[minSplitInd][1] = 1;
             } else {
                 // find the distribution based on prev element beyond the Primitive one
                 // generate costs for disks avRods+1 .. nDisks (formula: min of all possible splits)
-                let split: Split = this.getDiskDistr(avRods, nDisks - 1);
+                minSplitArr = [ [] ];
+                let split: Split = this.getDiskDistrM(avRods, nDisks - 1)[0];
                 
                 // try possible splits of diskCnt into avRods parts, and find the minimum cost
                 let ind = 0;
+
                 for (ind = avRods; ind > 1; ind--) {
-                if ( ! split[ind] ) break;
-                split[ind]++;
-                const cost: number = this.calculateCost(split);
-                if (cost < minCost) {
-                    minCost = cost;
-                    minSplit = [...split];
-                }
-                split[ind]--;
+                    if ( ! split[ind] ) break;
+                    split[ind]++;
+                    const cost: number = this.calculateCost(split);
+                    if (cost < minCost) {
+                        minCost = cost;
+                        minSplitArr = [ [...split] ];
+                    } else if ( cost === minCost ) {
+                        minSplitArr.push( [...split])
+                    };
+
+                    split[ind]--;
                 };
 
                 // save minimal cost 
@@ -243,9 +250,9 @@ export function hanoi(posts: number[]): number {
             }
 
             // save minimal split for diskCnt
-            this._splitsTable[avRods][nDisks] = minSplit;
+            this._splitsTable[avRods][nDisks] = [ ...minSplitArr[0] ];
 
-            return [ ...minSplit];
+            return minSplitArr;
         }
 
         isUpperDisk(disk: number): boolean {
@@ -517,6 +524,10 @@ export function hanoi(posts: number[]): number {
     const nRods: number = 4;
     const gBoard: GameBoard = new GameBoard(posts, nRods);
     // gBoard.moveDiskAll({ disk: nDisks, toDisk: 1, fromRod: 1, toRod: 2 });
+    let currDisk: number = gBoard.nDisks;
+    while ( currDisk > 0 && gBoard.gState[currDisk] === 1 ) currDisk--;
+    if ( currDisk === 0 ) return 0  // the tower is already in a target state - no moves needed
+    let targetSplits = gBoard.getDiskDistrM( nRods - 1, currDisk);
 
     return gBoard.moveTree.currNode.level;
 }
