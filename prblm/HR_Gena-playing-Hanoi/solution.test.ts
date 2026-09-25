@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { hanoi } from './solution.ts';
 
-test('Base case [1, 4, 1]', () => {
-  assert.equal(hanoi([1, 4, 1]), 3);
+test('Base case ', () => {
+  assert.equal(hanoi([1, 2, 4, 3, 4, 3, 4, 1]), 0);
 });
 
 // Rods	nDisks	Optimal moves

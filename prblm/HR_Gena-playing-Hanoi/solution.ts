@@ -1,27 +1,27 @@
 'use strict';
 
-import { WriteStream, createWriteStream } from "fs";
-process.stdin.resume();
-process.stdin.setEncoding('utf-8');
+// import { WriteStream, createWriteStream } from "fs";
+// process.stdin.resume();
+// process.stdin.setEncoding('utf-8');
 
-let inputString: string = '';
-let inputLines: string[] = [];
-let currentLine: number = 0;
+// let inputString: string = '';
+// let inputLines: string[] = [];
+// let currentLine: number = 0;
 
-process.stdin.on('data', function(inputStdin: string): void {
-    inputString += inputStdin;
-});
+// process.stdin.on('data', function(inputStdin: string): void {
+//     inputString += inputStdin;
+// });
 
-process.stdin.on('end', function(): void {
-    inputLines = inputString.split('\n');
-    inputString = '';
+// process.stdin.on('end', function(): void {
+//     inputLines = inputString.split('\n');
+//     inputString = '';
 
-    main();
-});
+//     main();
+// });
 
-function readLine(): string {
-    return inputLines[currentLine++];
-}
+// function readLine(): string {
+//     return inputLines[currentLine++];
+// }
 
 /*
  * Complete the 'hanoi' function below.
@@ -204,7 +204,7 @@ export function hanoi(posts: number[]): number {
         //   ind. - rod number (as in the costTable) among available rods (it's not a rod number as in rods array!)
         //   value - number of disks on
         // Also updates _costTable[avRods][nDisks] with minCost for minSplit
-        getDiskDistrM(avRods: number, nDisks: number): Array<Split> {
+        getDiskDistr(avRods: number, nDisks: number): Split {
             if (nDisks < 1 || avRods < 2) 
                 throw new Error(`getDiskDistr: incorrect parameters! (avRods=${avRods}, nDisks=${nDisks}`);
 
@@ -212,36 +212,30 @@ export function hanoi(posts: number[]): number {
                 this._splitsTable[avRods][nDisks] &&
                 this._splitsTable[avRods][nDisks].length 
             )
-                return [ [ ...this._splitsTable[avRods][nDisks] ] ];
+                return [ ...this._splitsTable[avRods][nDisks] ];
 
             let minCost: number = Number.MAX_SAFE_INTEGER;
             let minSplitInd: number = 0;
-            let minSplitArr: Array<Split>;
+            let minSplit: Split = [];
 
             if ( avRods === 2 ) {
-                minSplitArr = [ Array.from( {length: avRods + 1}, () => 0) ];
-                minSplitArr[minSplitInd][2] = nDisks - 1;
-                minSplitArr[minSplitInd][1] = 1;
+                minSplit = Array.from( {length: avRods + 1}, () => 0);
+                minSplit[2] = nDisks - 1;
+                minSplit[1] = 1;
             } else {
                 // find the distribution based on prev element beyond the Primitive one
                 // generate costs for disks avRods+1 .. nDisks (formula: min of all possible splits)
-                minSplitArr = [ [] ];
-                let split: Split = this.getDiskDistrM(avRods, nDisks - 1)[0];
+                let split: Split = this.getDiskDistr(avRods, nDisks - 1);
                 
                 // try possible splits of diskCnt into avRods parts, and find the minimum cost
-                let ind = 0;
-
-                for (ind = avRods; ind > 1; ind--) {
+                for (let ind = avRods; ind > 1; ind--) {
                     if ( ! split[ind] ) break;
                     split[ind]++;
                     const cost: number = this.calculateCost(split);
                     if (cost < minCost) {
                         minCost = cost;
-                        minSplitArr = [ [...split] ];
-                    } else if ( cost === minCost ) {
-                        minSplitArr.push( [...split])
+                        minSplit = [...split];
                     };
-
                     split[ind]--;
                 };
 
@@ -250,10 +244,43 @@ export function hanoi(posts: number[]): number {
             }
 
             // save minimal split for diskCnt
-            this._splitsTable[avRods][nDisks] = [ ...minSplitArr[0] ];
+            this._splitsTable[avRods][nDisks] = minSplit ;
+
+            return minSplit;
+        }
+
+        // Provides ALL disk dist.(splits) over available rods that take min number of moves.
+        // Returns an array of splits, splits are described in getDiskDistr().
+        getDiskDistrAll(avRods: number, nDisks: number): Array<Split> {
+            if (nDisks < 1 || avRods < 2) 
+                throw new Error(`getDiskDistr: incorrect parameters! (avRods=${avRods}, nDisks=${nDisks}`);
+
+            // check if it's in the base distribution or pre-determined distribution (avRods === 2)
+            if ( avRods === 2 || nDisks <= avRods ) return [ [...this.getDiskDistr(avRods, nDisks)] ];
+
+            const minCost: number = this.costTable[avRods][nDisks];
+            
+            let minSplitArr: Array<Split> = [];
+
+            // find the distribution based on prev element beyond the Primitive one
+            // generate costs for disks avRods+1 .. nDisks (formula: min of all possible splits)
+            let split: Split = this.getDiskDistr(avRods, nDisks - 1);
+            
+            // try all possible splits of diskCnt equal minCost
+            for (let ind = avRods; ind > 1; ind--) {
+                if ( ! split[ind] ) break;
+                split[ind]++;
+                const cost: number = this.calculateCost(split);
+                if (cost === minCost) {
+                    minSplitArr.push( [...split])
+                };
+
+                split[ind]--;
+            };
 
             return minSplitArr;
         }
+
 
         isUpperDisk(disk: number): boolean {
             const rod: number = this.gState[disk];
@@ -334,7 +361,7 @@ export function hanoi(posts: number[]): number {
             let nDisks2Move: number = this.rods[fromRod].length - diskSlot;
 
             //Get the disk distribution for movingPlan
-            const diskDistr: number[] = this.getDiskDistr(avRods, nDisks2Move);
+            const diskDistr: Split = this.getDiskDistr(avRods, nDisks2Move);
 
             // build movingPlan
             for (let i = 1; i < diskDistr.length; i++) {
@@ -527,9 +554,77 @@ export function hanoi(posts: number[]): number {
     let currDisk: number = gBoard.nDisks;
     while ( currDisk > 0 && gBoard.gState[currDisk] === 1 ) currDisk--;
     if ( currDisk === 0 ) return 0  // the tower is already in a target state - no moves needed
-    let targetSplits = gBoard.getDiskDistrM( nRods - 1, currDisk);
+    
+    let nDisks2M: number = currDisk;
+    // --- analyzing splits
+    const tgtSplits: Array<Split> = gBoard.getDiskDistrAll( nRods - 1, currDisk);
+    let tgtSplit2rodMap: Split = Array(nRods).fill(0);
+    let tgtSplit: Split = [];
+    console.log("Posts:", gBoard.gState);// --- DEBUG!
+    console.log(tgtSplits); // --- DEBUG!
+    
+    // --- finding target split
+    if ( tgtSplits.length === 1) {
+        tgtSplit = tgtSplits[0];
+    } else {
+        let tgtBaseDisksMatch: number = 0;
+        for ( let splitN = 0; splitN < tgtSplits.length; splitN++) {
+            let baseDisksMatch: number = 0;
+            let disksPassed: number = 0;
+            console.log("--> split:", tgtSplits[splitN]); // --- DEBUG!
+            for (let splitInd = 1; splitInd < tgtSplits[splitN].length; splitInd++) {
+                if (! tgtSplits[splitN][splitInd]) continue;
+                const diskN: number = currDisk - disksPassed;
+                console.log("    base diskN:", diskN);// --- DEBUG!
+                if ( gBoard.getDiskSlot(diskN) === 1) {
+                    console.log("    Match!");// --- DEBUG!
+                    tgtSplit2rodMap[splitInd] = gBoard.gState[diskN];
+                    baseDisksMatch++;
+                };
+                disksPassed += tgtSplits[splitN][splitInd];
+            };
+            if ( baseDisksMatch > tgtBaseDisksMatch) {
+                tgtBaseDisksMatch = baseDisksMatch;
+                tgtSplit = [...tgtSplits[splitN]];
+            };
+            console.log("  baseDisksMatch:", baseDisksMatch); // --- DEBUG!
+        };
 
-    return gBoard.moveTree.currNode.level;
+        if ( tgtBaseDisksMatch === 2 ) {
+            let splitInd = 1;
+            while ( tgtSplit2rodMap[splitInd] ) splitInd++;
+            let unassignedRod: number = 2;
+            while ( tgtSplit2rodMap.includes(unassignedRod) ) unassignedRod++;
+            tgtSplit2rodMap[splitInd] = unassignedRod;
+        }
+    };
+    console.log("Target split:", tgtSplit); // --- DEBUG
+    console.log("tgtSplit2rodMap:", tgtSplit2rodMap); // --- DEBUG!
+
+    // --- finding "stray" disks
+    const strayDisks: Array<MoveDiskParams> = [];
+    const usedRods: number[] = [];
+    let currRod: number = 0;
+    for (let diskN = currDisk; diskN > 0; diskN--)
+        if ( gBoard.gState[diskN] !== currRod )
+            if ( gBoard.getDiskSlot(diskN) === 1)
+                currRod = gBoard.gState[diskN];
+            else
+                strayDisks.unshift({disk: diskN, toDisk: NaN, fromRod: currRod, toRod: NaN});
+    
+    // --- DEBUG
+    for ( let i = 0; i < strayDisks.length; i++)
+        console.log(`Stray disk(${i}):`, strayDisks[i]);
+
+
+    
+    const sanMovingPlan: Array<MoveDiskParams> = [];
+
+
+    return  0; // gBoard.moveTree.currNode.level;
+
+    //================ functions AUX to hanoi ============
+
 }
 
 
