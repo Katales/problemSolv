@@ -561,7 +561,7 @@ export function hanoi(posts: number[]): number {
     let tgtSplit2rodMap: Split = Array(nRods).fill(0);
     let tgtSplit: Split = [];
     console.log("Posts:", gBoard.gState);// --- DEBUG!
-    console.log(tgtSplits); // --- DEBUG!
+    console.log("Target splits", tgtSplits); // --- DEBUG!
     
     // --- finding target split
     if ( tgtSplits.length === 1) {
@@ -598,7 +598,7 @@ export function hanoi(posts: number[]): number {
             tgtSplit2rodMap[splitInd] = unassignedRod;
         }
     };
-    console.log("Target split:", tgtSplit); // --- DEBUG
+    console.log("Chosen TargetSplit:", tgtSplit); // --- DEBUG
     console.log("tgtSplit2rodMap:", tgtSplit2rodMap); // --- DEBUG!
 
     // --- finding "stray" disks
@@ -610,15 +610,31 @@ export function hanoi(posts: number[]): number {
             if ( gBoard.getDiskSlot(diskN) === 1)
                 currRod = gBoard.gState[diskN];
             else
-                strayDisks.unshift({disk: diskN, toDisk: NaN, fromRod: currRod, toRod: NaN});
+                strayDisks.unshift({disk: diskN, toDisk: NaN, fromRod: gBoard.gState[diskN], toRod: currRod});
     
     // --- DEBUG
     for ( let i = 0; i < strayDisks.length; i++)
         console.log(`Stray disk(${i}):`, strayDisks[i]);
 
 
+    // --- relocate disks One-by-One
+    const movingPlan: Array<MoveDiskParams> = [];
+    let diskN: number = currDisk;
+    while (diskN > 0) {
+        const fromRod: number = gBoard.gState[diskN];
+        let toDisk: number = diskN;
+        while (gBoard.gState[toDisk] === fromRod && toDisk > 0) toDisk--;
+        toDisk++;
+        // --- last move first
+        movingPlan.push({disk: diskN, toDisk, fromRod, toRod: 1}); // !!! hardcoded toRod: 1 
+        diskN = toDisk - 1;
+        
+    }
+    // --- DEBUG
+    console.log("Moving plan:");
+    for ( let i = 0; i < movingPlan.length; i++)
+        console.log(`move(${i}):`, movingPlan[i]);
     
-    const sanMovingPlan: Array<MoveDiskParams> = [];
 
 
     return  0; // gBoard.moveTree.currNode.level;
