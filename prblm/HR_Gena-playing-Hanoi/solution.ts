@@ -619,17 +619,34 @@ export function hanoi(posts: number[]): number {
 
     // --- relocate disks One-by-One
     const movingPlan: Array<MoveDiskParams> = [];
-    let diskN: number = currDisk;
-    while (diskN > 0) {
-        const fromRod: number = gBoard.gState[diskN];
-        let toDisk: number = diskN;
+    
+    while (currDisk > 0) {
+        const fromRod: number = gBoard.gState[currDisk];
+        let toDisk: number = currDisk;
         while (gBoard.gState[toDisk] === fromRod && toDisk > 0) toDisk--;
-        toDisk++;
+        toDisk++; // VERIFICATION: `toDisk` shouldn't be changed till the end of loop body!!!
         // --- last move first
-        movingPlan.push({disk: diskN, toDisk, fromRod, toRod: 1}); // !!! hardcoded toRod: 1 
-        diskN = toDisk - 1;
-        
+        movingPlan.push({disk: currDisk, toDisk, fromRod, toRod: 1}); // !!! hardcoded toRod: 1 
+        console.log(`Final move (Moving Plan):`, movingPlan[0]);
+
+        const blockers: Array<MoveDiskParams> = [];
+        for (let diskN = toDisk - 1; diskN > 0; diskN--) {
+            if (gBoard.gState[diskN] === fromRod || gBoard.gState[diskN] === 1) {
+                blockers.push({disk: diskN, toDisk: diskN, fromRod: gBoard.gState[diskN], toRod: NaN });
+            }
+
+        }
+
+        // --- DEBUG
+        console.log("Blocking Disks:");
+        for ( let i = 0; i < blockers.length; i++)
+            console.log(`blocker(${i}):`, blockers[i]);
+
+
+        currDisk = toDisk - 1;
+        break; // --- DEBUG
     }
+
     // --- DEBUG
     console.log("Moving plan:");
     for ( let i = 0; i < movingPlan.length; i++)
@@ -640,6 +657,27 @@ export function hanoi(posts: number[]): number {
     return  0; // gBoard.moveTree.currNode.level;
 
     //================ functions AUX to hanoi ============
+
+    // Remove disk to its best place
+    // from `diskParams` it uses only `disk` and `fromRod`
+    // returns: number of moves
+    function removeDisk(diskParams: MoveDiskParams): number {
+
+    };
+
+    // Moves disk between other disks 
+    // from `diskParams` it uses: `disk`, `fromRod`, `toRod`
+    //returns: number of moves
+    function moveInDisk(diskParams: MoveDiskParams): number {
+
+    }
+
+    // if diskN found among strayDisks returns  `arr.index`, otherwise returns `0`
+    function findInStrayDisk(diskN: number): number {
+        let i: number = 0;
+        while ( strayDisks[i].disk !== diskN && i < strayDisks.length) i++;
+        return (i < strayDisks.length) ? i : 0;
+    };
 
 }
 
